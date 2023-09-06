@@ -2,7 +2,7 @@
 title: "trial hw"
 author: "kelly"
 format: html
-editor: visual
+editor: source
 ---
 
 ## Quarto
@@ -32,6 +32,7 @@ library(datasauRus)
 
 dat <- datasaurus_dozen[datasaurus_dozen$dataset == 'dino', ]
 
-ggplot(data = dat, mapping = aes(x = x, y = y)) +
+g <- ggplot(data = dat, mapping = aes(x = x, y = y)) +
   geom_point()
+g
 ```
