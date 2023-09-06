@@ -13,7 +13,7 @@ jobs:
         missing = checklist::missing_pkgs(dir = "./", glob = "hw1.qmd")
         if(length(missing)){
             install.packages("pak")
-            pak::pkg_install(missing)
+            pak::pkg_install(missing, dependencies = TRUE)
         }
       shell: Rscript {0}
     - name: Check Renders
