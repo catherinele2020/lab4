@@ -10,7 +10,8 @@ jobs:
       uses: actions/checkout@v3
     - name: Install Missing Packages
       run: |
-        missing = checklist::install_missing_pkgs(dir = "./", glob = "hw1.qmd")
+        if (!require("BiocManager", quietly = TRUE)) install.packages("BiocManager")
+        missing = checklist::install_missing_pkgs(dir = "./", glob = "hw1.qmd", repos = BiocManager::repositories())
       shell: Rscript {0}
     - name: Check Renders
       run: |
