@@ -37,17 +37,3 @@ dat <- datasaurus_dozen[datasaurus_dozen$dataset == 'dino', ]
 ggplot(data = dat, mapping = aes(x = x, y = y)) +
   geom_point()
 ```
-
-```{r}
-library(slingshot)
-
-data("slingshotExample")
-rd <- slingshotExample$rd
-cl <- slingshotExample$cl
-pto <- slingshot(rd, cl, start.clus = '1')
-
-# plotting
-sds <- as.SlingshotDataSet(pto)
-plot(rd, col = cl, asp = 1)
-lines(sds, type = 'c', lwd = 3)
-```

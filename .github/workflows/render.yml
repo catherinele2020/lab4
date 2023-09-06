@@ -1,5 +1,5 @@
 on: push
-name: Check Assignment
+name: Check Render
 jobs:  
   check-renders:
     runs-on: ubuntu-latest
@@ -10,7 +10,7 @@ jobs:
       uses: actions/checkout@v3
     - name: Install Missing Packages
       run: |
-        missing = checklist::missing_pkgs(dir = "./", glob = "hw1.qmd")
+        missing = checklist::missing_pkgs(dir = "./", glob = "submit.qmd")
         if(length(missing)){
             install.packages("pak")
             pak::pkg_install(missing, dependencies = TRUE)
@@ -18,10 +18,10 @@ jobs:
       shell: Rscript {0}
     - name: Check Renders
       run: |
-        checklist::check_qmd_renders("hw1.qmd")
+        checklist::check_qmd_renders("submit.qmd")
       shell: Rscript {0}
     - name: Create artifacts
       uses: actions/upload-artifact@v3
       with:
-        name: hw1-html
-        path: hw1.html
+        name: submit-html
+        path: submit.html
