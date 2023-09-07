@@ -1,7 +1,9 @@
 ---
-title: "Untitled"
-format: html
-editor: visual
+title: ""
+author: ""
+format:
+  html:
+    embed-resources: true
 ---
 
 ## Quarto
