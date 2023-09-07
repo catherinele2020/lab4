@@ -4,7 +4,7 @@ jobs:
   check-renders:
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/sta523-fa22/sta523-base:latest
+      image: rocker/verse:latest
     steps:
     - name: Checkout
       uses: actions/checkout@v3
