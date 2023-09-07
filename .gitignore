@@ -49,3 +49,7 @@ po/*~
 rsconnect/
 
 data/
+
+# Mac artifacts
+**/.DS_Store
+
