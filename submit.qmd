@@ -1,28 +1,244 @@
 ---
-title: ""
-author: ""
-format:
+title: "PM566_Lab04"
+format: 
   html:
-    embed-resources: true
+    embed resources: true
+editor: visual
 ---
 
-## Quarto
-
-Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
-
-## Running Code
-
-When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
+## 1. Read in the data
 
 ```{r}
-1 + 1
+library(tidyverse)
+library(data.table)
+library(magrittr)
+library(leaflet)
+library(gganimate)
+
+if (!file.exists("met_all.gz"))
+  download.file(
+    url = "https://raw.githubusercontent.com/USCbiostats/data-science-data/master/02_met/met_all.gz",
+    destfile = "met_all.gz",
+    method   = "libcurl",
+    timeout  = 60
+  )
+met <- data.table::fread("met_all.gz")
 ```
 
-You can add options to executable code like this
+## 2. Prepare the data
+
+Removing temperatures less than -17
 
 ```{r}
-#| echo: false
-2 * 2
+met <- met[met$temp > -17][elev == 9999.0, elev := NA]
 ```
 
-The `echo: false` option disables the printing of code (only output is displayed).
+Creating date variable
+
+```{r}
+met$date_variable <- as.Date(paste(met$year, met$month, met$day, sep = "-"))
+```
+
+Keep observations for the first week of the month
+
+```{r}
+met$date_week <- data.table::week(as.Date(paste(met$year, met$month, met$day, sep = "-")))
+```
+
+Creating an aggregate of mean
+
+```{r}
+met_avg <- met[,.(
+  temp     = mean(temp,na.rm=TRUE),
+  rh       = mean(rh,na.rm=TRUE),
+  wind.sp  = mean(wind.sp,na.rm=TRUE),
+  vis.dist = mean(vis.dist,na.rm=TRUE),
+  dp       = mean(dew.point, na.rm = TRUE),
+  lat      = mean(lat),
+  lon      = mean(lon), 
+  elev     = mean(elev,na.rm=TRUE)
+), by=c("USAFID", "day")]
+```
+
+Creating a region variable
+
+```{r}
+met_avg$regionlat <- cut(met_avg$lat, 
+                         breaks=c(24.55525, 39.71, 48.941),
+                         labels=c('N', 'S'))
+met_avg$regionlon <- cut(met_avg$lon, 
+                         breaks=c(-124.29, -98.00, -68.313),
+                         labels=c('E', 'W'))
+met_avg$region <- paste(met_avg$regionlat, met_avg$regionlon, sep = "")
+
+```
+
+Creating a elevation categorical variable
+
+```{r}
+met_avg[, elev_cat := fifelse(elev > 252, "high", "low")]
+```
+
+### **3. Use `geom_violin` to examine the wind speed and dew point by region**
+
+```{r}
+?geom_violin
+
+met_avg[!is.na(region)] %>% 
+  ggplot() + 
+  geom_violin(mapping = aes(x = as.factor(1), y = dp, fill = region)) +
+  facet_wrap(~ region, nrow = 1)
+```
+
+The NE region and NW region has a larger range of dew points than the other regions.
+
+### **4. Use `geom_jitter` with `stat_smooth` to examine the association between dew point and wind speed by region**
+
+```{r}
+?stat_smooth
+met_avg[!is.na(region)] %>% 
+  ggplot(aes(x = dp, y = wind.sp, color = region)) +
+  geom_jitter(alpha = 0.5, width = 0.2) +  # Adds jittered points
+  stat_smooth(method = "lm", se = FALSE) +  # Adds a linear regression line
+  facet_wrap(~ region, ncol = 1)
+
+```
+
+The NE region has a larger distribution of data than the other regions
+
+### **5. Use `geom_bar` to create barplots of the weather stations by elevation category colored by region**
+
+```{r}
+ggplot(met_avg, aes(x = met_avg$elev_cat, fill = region)) +
+  geom_bar(position = "dodge", na.rm = TRUE) +
+  labs(
+    title = "Weather Stations by Elevation Category",
+    x = "Elevation Category",
+    y = "Count"
+  ) 
+
+```
+
+There are over 15000 weather stations with low elevation (less than 252) in the NW.
+
+### **6. Use `stat_summary` to examine mean dew point and wind speed by region with standard deviation error bars**
+
+**Dew Point by Region Plot**
+
+```{r}
+ggplot(met_avg, aes(x = region, y = dp)) +
+  stat_summary(
+    fun.data = "mean_sdl", # calculates mean and SD
+    fun.args = list(mult = 1),
+    geom = "bar",
+    width = 0.3,
+    fill = "blue",
+    color = "black"
+  ) +
+  stat_summary(
+    fun.data = "mean_sdl",
+    fun.args = list(mult = 1),
+    geom = "errorbar", # creates error bars
+    width = 0.1,
+    color = "black"
+  ) +
+  labs(
+    title = "Mean Dew Point by Region",
+    x = "Region",
+    y = "Dew Point"
+  ) 
+```
+
+NW has the largest mean dew point, and NE has the most variability (largest SD) for dew point.
+
+**Wind Speed by Region**
+
+```{r}
+ggplot(met_avg, aes(x = region, y = wind.sp)) +
+  stat_summary(
+    fun.data = "mean_sdl", # calculates mean and SD
+    fun.args = list(mult = 1),
+    geom = "bar",
+    width = 0.3,
+    fill = "blue",
+    color = "black"
+  ) +
+  stat_summary(
+    fun.data = "mean_sdl",
+    fun.args = list(mult = 1),
+    geom = "errorbar", # creates error bars
+    width = 0.1,
+    color = "black"
+  ) +
+  labs(
+    title = "Mean Wind Speed by Region",
+    x = "Region",
+    y = "Wind Speed"
+  ) 
+```
+
+NE has the largest mean for wind speed, and SE has the largest variability in wind speed data (highest SD).
+
+### **7. Make a map showing the spatial trend in relative humidity in the US**
+
+```{r}
+temp.pal <- colorNumeric(c('lightgreen','pink','purple'), domain = met_avg$rh)
+
+rh_map <- leaflet(met_avg) %>%
+  addProviderTiles('CartoDB.Positron') %>%
+  addCircles(
+    lat = ~lat,
+    lng = ~lon,
+    label = ~paste0(round(rh, 2), ' % RH'),  # Label with RH values
+    color = ~temp.pal(rh),  # Use the RH palette
+    opacity = 1,
+    fillOpacity = 1,
+    radius = 500
+  ) %>%
+  addLegend(
+    'bottomleft',
+    pal = temp.pal,
+    values = met_avg$rh,
+    title = 'Relative Humidity (%)',
+    opacity = 1)
+
+  
+# top 10 rank but it doesn't work 
+
+# top_10 <- met_avg$rh %>%
+#   arrange(desc(rh)) %>%
+#   head(10)
+
+    # addMarkers(
+    # data = top_10,
+    # popup = ~paste("RH:", rh, "%"),
+    # label = ~paste("Rank:", rank(-rh)),
+    # color = ~custom_colors(rh),
+    # labelOptions = labelOptions(noHide = TRUE)
+    
+rh_map
+```
+
+Relative humidity seems to be higher on the east coast than the west coast
+
+### **8. Use a ggplot extension**
+
+```{r}
+simple_plot <- ggplot(met_avg, aes(x = met_avg$elev_cat, fill = region)) +
+  geom_bar(position = "dodge", na.rm = TRUE) +
+  labs(
+    title = "Weather Stations by Elevation Category",
+    x = "Elevation Category",
+    y = "Count"
+  ) +
+  transition_states(
+    gear,
+    transition_length = 2,
+    state_length = 1
+  ) +
+  enter_fade() + 
+  exit_shrink() +
+  ease_aes('sine-in-out')
+simple_plot
+
+```
